@@ -1,143 +1,145 @@
 <!doctype html>
 <html lang="es">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>Sistema Visitas PL</title>
 
-  <!-- Open Sans -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
 
-  <link rel="stylesheet" href="./styles.css" />
-
-  <!-- Supabase (browser) -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-  <!-- Chart.js (pie) -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
+  <link rel="stylesheet" href="styles.css"/>
 </head>
 
 <body>
-  <header class="topbar">
-    <div class="brand">
-      <div class="logo"></div>
-      <div>
-        <div class="title">Sistema de Visitas PL</div>
-        <div class="subtitle">Dashboard + Registro (estilo Calibraciones7)</div>
+
+<header class="header">
+  <div class="brand">
+    <div class="logo"></div>
+    <div>
+      <div class="title">Sistema de Visitas PL</div>
+      <div class="subtitle">Panel Corporativo</div>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" data-tab="dashboard">Dashboard</button>
+    <button class="tab" data-tab="registro">Registro</button>
+  </div>
+</header>
+
+<main class="container">
+
+  <!-- DASHBOARD -->
+  <section id="dashboard" class="panel active">
+
+    <div class="grid2">
+
+      <div class="card large">
+        <div class="cardHeader">
+          <h3>Distribución por tipo de comando</h3>
+        </div>
+        <canvas id="pieChart"></canvas>
+      </div>
+
+      <div class="card">
+        <h3>Resumen General</h3>
+
+        <div class="statRow">
+          <div>
+            <div class="muted">PLs</div>
+            <div id="statPls" class="big">0</div>
+          </div>
+
+          <div>
+            <div class="muted">Eventos</div>
+            <div id="statEventos" class="big">0</div>
+          </div>
+        </div>
+
+        <div id="contadorOperadores" class="operadorList"></div>
+
+      </div>
+
+    </div>
+
+    <!-- FILTROS -->
+    <div class="card">
+      <h3>Filtros</h3>
+
+      <div class="filterGrid">
+        <select id="filterOperador"></select>
+        <select id="filterEstado"></select>
+        <select id="filterSemaforo">
+          <option value="">Todos</option>
+          <option value="ROJA">ROJA</option>
+          <option value="VERDE">VERDE</option>
+        </select>
+        <select id="filter2500">
+          <option value="">Grupo 2500</option>
+          <option value="true">Sí</option>
+          <option value="false">No</option>
+        </select>
+
+        <button id="btnAplicarFiltros" class="btn">Aplicar</button>
       </div>
     </div>
 
-    <nav class="tabs">
-      <button class="tab active" data-tab="dashboard">Dashboard</button>
-      <button class="tab" data-tab="registro">Registro</button>
-    </nav>
-  </header>
+  </section>
 
-  <main class="container">
-    <!-- DASHBOARD -->
-    <section id="dashboard" class="panel active">
-      <div class="grid">
-        <div class="card">
-          <div class="cardTitle">Distribución por tipo de comando</div>
-          <div class="chartWrap">
-            <canvas id="pieChart"></canvas>
-          </div>
-          <div id="legendPills" class="pills"></div>
-        </div>
+  <!-- REGISTRO -->
+  <section id="registro" class="panel">
 
-        <div class="card">
-          <div class="cardTitle">Resumen</div>
-          <div class="stats">
-            <div class="stat">
-              <div class="muted">PLs registradas</div>
-              <div id="statPls" class="big">0</div>
-            </div>
-            <div class="stat">
-              <div class="muted">Eventos totales</div>
-              <div id="statEventos" class="big">0</div>
-            </div>
-            <div class="row">
-              <span id="badgeRoja" class="badge"></span>
-              <span id="badgeVerde" class="badge"></span>
-              <span id="badge2500" class="badge neutral"></span>
-            </div>
-          </div>
+    <div class="card">
+      <h3>Agregar PL</h3>
 
-          <hr class="sep" />
+      <div class="formGrid">
+        <input id="pl" placeholder="PL"/>
+        <input id="razon_social" placeholder="RAZÓN SOCIAL"/>
+        <input id="estado" placeholder="ESTADO"/>
+        <input id="municipio" placeholder="MUNICIPIO"/>
+        <input id="direccion" placeholder="DIRECCIÓN"/>
+        <input id="operador" placeholder="OPERADOR"/>
 
-          <div class="cardTitle">Agregar nuevo comando</div>
-          <div class="formRow">
-            <input id="newCmdName" class="input" placeholder='Ej: "VISITA_CON_PROFEPA"' />
-            <input id="newCmdColor" class="input" type="color" value="#64748B" />
-            <button id="btnAddCmd" class="btn ghost">Agregar</button>
-          </div>
-          <div class="muted small">El comando nuevo aparece en Registro y suma al pastel.</div>
-        </div>
+        <select id="semaforo">
+          <option value="VERDE">VERDE</option>
+          <option value="ROJA">ROJA</option>
+        </select>
+
+        <label class="check">
+          <input id="grupo_2500" type="checkbox"/>
+          Grupo 2500
+        </label>
+
+        <button id="btnAddPL" class="btn full">Guardar PL</button>
       </div>
-    </section>
+    </div>
 
-    <!-- REGISTRO -->
-    <section id="registro" class="panel">
-      <div class="card">
-        <div class="cardTitle">Agregar PL</div>
+    <div class="card">
+      <h3>Registrar Evento</h3>
 
-        <div class="gridForm">
-          <input id="pl" class="input" placeholder="PL" />
-          <input id="razon_social" class="input" placeholder="RAZÓN SOCIAL" />
-          <input id="estado" class="input" placeholder="ESTADO" />
-          <input id="municipio" class="input" placeholder="MUNICIPIO" />
-          <input id="direccion" class="input span2" placeholder="DIRECCIÓN" />
-          <input id="operador" class="input" placeholder="OPERADOR" />
-
-          <select id="semaforo" class="input">
-            <option value="VERDE">VERDE</option>
-            <option value="ROJA">ROJA</option>
-          </select>
-
-          <label class="check">
-            <input id="grupo_2500" type="checkbox" />
-            Está en grupo 2500
-          </label>
-
-          <div class="actions span4">
-            <button id="btnAddPL" class="btn">Guardar PL</button>
-          </div>
-        </div>
+      <div class="formGrid">
+        <select id="ev_pl"></select>
+        <select id="ev_tipo"></select>
+        <input id="ev_fecha" type="date"/>
+        <input id="ev_notas" placeholder="Notas"/>
+        <button id="btnAddEvento" class="btn full">Guardar Evento</button>
       </div>
+    </div>
 
-      <div class="card">
-        <div class="cardTitle">Registrar evento (verificación / calibración / etc.)</div>
+    <div class="card">
+      <h3>Listado de PLs</h3>
+      <div id="plList"></div>
+    </div>
 
-        <div class="gridForm">
-          <select id="ev_pl" class="input"></select>
-          <select id="ev_tipo" class="input"></select>
-          <input id="ev_fecha" class="input" type="date" />
-          <input id="ev_notas" class="input" placeholder="Notas (opcional)" />
-          <div class="actions span4">
-            <button id="btnAddEvento" class="btn">Guardar evento</button>
-          </div>
-        </div>
-      </div>
+  </section>
 
-      <div class="card">
-        <div class="cardTitle">Listado de PLs</div>
-        <div class="tableWrap">
-          <table class="table" id="plsTable">
-            <thead>
-              <tr>
-                <th>PL</th><th>RAZÓN SOCIAL</th><th>ESTADO</th><th>MUNICIPIO</th>
-                <th>DIRECCIÓN</th><th>OPERADOR</th><th>ROJA/VERDE</th><th>GRUPO 2500</th>
-              </tr>
-            </thead>
-            <tbody></tbody>
-          </table>
-        </div>
-      </div>
-    </section>
-  </main>
+</main>
 
-  <script src="./app.js"></script>
+<script src="app.js"></script>
 </body>
 </html>
