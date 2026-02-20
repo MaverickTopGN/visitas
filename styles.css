@@ -373,3 +373,209 @@ input:focus, select:focus{
   .formGrid{ grid-template-columns: 1fr; }
   .span2,.full{ grid-column: auto; }
 }
+/* ===== Right tools (month + export) ===== */
+.rightTools{
+  display:flex;
+  gap:10px;
+  align-items:center;
+}
+
+.monthInput{
+  width: 160px;
+  padding: 10px 12px;
+  border-radius: 12px;
+}
+
+/* Secondary button (glass) */
+.btnSecondary{
+  background: rgba(255,255,255,.10);
+  box-shadow: none;
+  border: 1px solid rgba(255,255,255,.16);
+}
+.btnSecondary:hover{
+  filter: brightness(1.08);
+}
+
+/* ===== Calendar ===== */
+.calendar{
+  margin-top: 10px;
+}
+
+.calHeader{
+  display:grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.calDow{
+  font-size: 12px;
+  font-weight: 900;
+  color: rgba(245,247,255,.72);
+  text-align:center;
+  padding: 8px 0;
+  border-radius: 12px;
+  background: rgba(255,255,255,.06);
+  border: 1px solid rgba(255,255,255,.10);
+}
+
+.calGrid{
+  display:grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 10px;
+}
+
+.calCell{
+  position: relative;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,.12);
+  background: rgba(255,255,255,.06);
+  padding: 10px 10px 12px 10px;
+  min-height: 74px;
+  cursor: pointer;
+  transition: transform .12s ease, border-color .18s ease, background .18s ease;
+}
+
+.calCell:hover{
+  transform: translateY(-2px);
+  border-color: rgba(255,255,255,.22);
+}
+
+.calCell.empty{
+  cursor: default;
+  opacity: .45;
+  background: rgba(0,0,0,.08);
+}
+
+.calDay{
+  font-weight: 900;
+  font-size: 12px;
+  color: rgba(245,247,255,.90);
+}
+
+.calCount{
+  position:absolute;
+  right: 10px;
+  bottom: 10px;
+  font-weight: 900;
+  font-size: 12px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,.16);
+  background: rgba(10,10,20,.22);
+  color: rgba(245,247,255,.92);
+}
+
+/* Intensity levels (liquid glass) */
+.calCell.level0{ background: rgba(255,255,255,.05); }
+.calCell.level1{ background: rgba(59,130,246,.14); }
+.calCell.level2{ background: rgba(59,130,246,.22); }
+.calCell.level3{ background: rgba(177,42,106,.22); }
+.calCell.level4{ background: rgba(177,42,106,.32); }
+
+.calLegend{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  margin-top: 6px;
+}
+
+.calSwatch{
+  width: 18px;
+  height: 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,.16);
+}
+.calSwatch.level0{ background: rgba(255,255,255,.05); }
+.calSwatch.level1{ background: rgba(59,130,246,.14); }
+.calSwatch.level2{ background: rgba(59,130,246,.22); }
+.calSwatch.level3{ background: rgba(177,42,106,.22); }
+.calSwatch.level4{ background: rgba(177,42,106,.32); }
+
+/* ===== Modal ===== */
+.modalOverlay{
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.55);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 999;
+}
+
+.modalOverlay.open{
+  display:flex;
+}
+
+.modalCard{
+  width: min(920px, 96vw);
+  max-height: 80vh;
+  overflow: auto;
+  border-radius: 18px;
+  padding: 16px;
+  border: 1px solid rgba(255,255,255,.18);
+  background: linear-gradient(135deg, rgba(255,255,255,.12), rgba(255,255,255,.06));
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  box-shadow: 0 30px 70px rgba(0,0,0,.45);
+}
+
+.modalTop{
+  display:flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.modalTitle{
+  font-weight: 900;
+  font-size: 14px;
+  letter-spacing: .2px;
+}
+
+.modalSubtitle{
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+.iconBtn{
+  background: rgba(255,255,255,.10);
+  color: rgba(245,247,255,.92);
+  border: 1px solid rgba(255,255,255,.18);
+  border-radius: 12px;
+  padding: 8px 10px;
+  cursor: pointer;
+}
+
+.modalBody{
+  display: grid;
+  gap: 10px;
+}
+
+.modalItem{
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,.12);
+  background: rgba(10,10,20,.20);
+  padding: 12px;
+}
+
+.modalItemTop{
+  display:flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: baseline;
+}
+
+.modalStrong{
+  font-weight: 900;
+  color: rgba(245,247,255,.95);
+}
+
+.modalMeta{
+  font-size: 12px;
+  color: rgba(245,247,255,.66);
+  margin-top: 6px;
+}
+
