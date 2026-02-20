@@ -103,18 +103,54 @@ function renderPie(tipos, eventos) {
 
   const labels = Object.keys(count);
   const values = Object.values(count);
+
+  // Color por tipo
   const colors = labels.map((l) => {
     const tipo = tipos.find((t) => t.nombre === l);
-    return tipo?.color || "#64748B";
+    return tipo?.color || "#94A3B8";
   });
 
   if (pieChart) pieChart.destroy();
 
   pieChart = new Chart(canvas, {
-    type: "pie",
+    type: "doughnut",
     data: {
       labels,
-      datasets: [{ data: values, backgroundColor: colors }],
+      datasets: [{
+        data: values,
+        backgroundColor: colors,
+        borderColor: "rgba(255,255,255,.20)",
+        borderWidth: 1,
+        hoverOffset: 10,
+        spacing: 2,
+      }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      cutout: "68%",                 // más “friendly”
+      radius: "88%",                 // no tan grande
+      plugins: {
+        legend: {
+          position: "bottom",
+          labels: {
+            color: "rgba(245,247,255,.82)",
+            boxWidth: 10,
+            boxHeight: 10,
+            padding: 14,
+            font: { family: "Open Sans", size: 12, weight: "700" },
+          },
+        },
+        tooltip: {
+          backgroundColor: "rgba(15, 23, 42, .92)",
+          titleColor: "rgba(245,247,255,.92)",
+          bodyColor: "rgba(245,247,255,.86)",
+          borderColor: "rgba(255,255,255,.18)",
+          borderWidth: 1,
+          padding: 12,
+          cornerRadius: 10,
+        },
+      },
     },
   });
 }
