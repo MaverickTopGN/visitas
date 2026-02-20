@@ -190,6 +190,51 @@
         </div>
 
       </div>
+<!-- EVENTOS POR DÍA (CALENDARIO) + EXPORT -->
+<div class="card">
+  <div class="cardTop">
+    <h3>Eventos por Día (Calendario)</h3>
+    <div class="rightTools">
+      <input id="calMonth" class="monthInput" type="month" />
+      <button id="btnExportCSV" class="btn btnSecondary" type="button">Exportar CSV</button>
+    </div>
+  </div>
+
+  <div class="calLegend">
+    <span class="muted">Intensidad:</span>
+    <span class="calSwatch level0"></span>
+    <span class="calSwatch level1"></span>
+    <span class="calSwatch level2"></span>
+    <span class="calSwatch level3"></span>
+    <span class="calSwatch level4"></span>
+    <span class="muted">más eventos</span>
+  </div>
+
+  <div class="calendar">
+    <div class="calHeader">
+      <div class="calDow">Lun</div><div class="calDow">Mar</div><div class="calDow">Mié</div>
+      <div class="calDow">Jue</div><div class="calDow">Vie</div><div class="calDow">Sáb</div><div class="calDow">Dom</div>
+    </div>
+
+    <div id="calendarGrid" class="calGrid"></div>
+  </div>
+
+  <div class="hint">Click en un día para ver detalle (PL + tipo + notas). Exporta CSV del mes seleccionado respetando filtros.</div>
+</div>
+
+<!-- MODAL: detalle del día -->
+<div id="dayModal" class="modalOverlay" aria-hidden="true">
+  <div class="modalCard" role="dialog" aria-modal="true">
+    <div class="modalTop">
+      <div>
+        <div id="modalTitle" class="modalTitle">Detalle del día</div>
+        <div id="modalSubtitle" class="modalSubtitle muted"></div>
+      </div>
+      <button id="btnCloseModal" class="iconBtn" type="button" aria-label="Cerrar">✕</button>
+    </div>
+    <div id="modalBody" class="modalBody"></div>
+  </div>
+</div>
 
       <!-- LISTA / MINI HISTORIAL -->
       <div class="card">
