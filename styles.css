@@ -15,8 +15,7 @@
   --shadowSoft: 0 10px 30px rgba(0,0,0,.22);
 
   --radius: 18px;
-
-  --accent:#3b82f6; /* botones */
+  --accent:#3b82f6;
 }
 
 *{ box-sizing:border-box; }
@@ -28,7 +27,6 @@ body{
   font-family:'Open Sans', system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
   color:var(--text);
 
-  /* Liquid glass gradient base */
   background:
     radial-gradient(1200px 700px at 15% 10%, rgba(91,26,119,.85), transparent 55%),
     radial-gradient(900px 600px at 80% 25%, rgba(177,42,106,.70), transparent 55%),
@@ -36,7 +34,7 @@ body{
     linear-gradient(135deg, var(--bg1), var(--bg2) 35%, var(--bg3) 70%, var(--bg4));
 }
 
-/* ===== Header (glass / premium) ===== */
+/* ===== Header ===== */
 .header{
   position:sticky;
   top:0;
@@ -48,6 +46,15 @@ body{
 
   background: linear-gradient(135deg, rgba(0,0,0,.38), rgba(255,255,255,.06));
   border-bottom: 1px solid rgba(255,255,255,.12);
+}
+
+.headerInner{
+  max-width:1240px;
+  margin:0 auto;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:14px;
 }
 
 .brand{
@@ -118,12 +125,11 @@ body{
 }
 
 .panel{ display:none; }
-.panel.active{ display:block; }
+.panel.active{ display:block; animation: fadeIn .18s ease; }
 
-.grid2{
-  display:grid;
-  grid-template-columns: 1.6fr .9fr;
-  gap: 18px;
+@keyframes fadeIn{
+  from{ opacity:0; transform: translateY(4px); }
+  to{ opacity:1; transform: translateY(0); }
 }
 
 /* ===== Cards: glass ===== */
@@ -140,6 +146,13 @@ body{
 
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
+  transition: transform .12s ease, box-shadow .18s ease, border-color .18s ease;
+}
+
+.card:hover{
+  transform: translateY(-2px);
+  border-color: rgba(255,255,255,.22);
+  box-shadow: var(--shadow);
 }
 
 .card::before{
@@ -151,46 +164,84 @@ body{
     radial-gradient(300px 180px at 85% 25%, rgba(59,130,246,.22), transparent 70%),
     radial-gradient(320px 190px at 65% 90%, rgba(177,42,106,.22), transparent 70%);
   pointer-events:none;
-  filter: blur(0px);
 }
 
 .card > *{ position:relative; z-index:1; }
 
 .card h3{
-  margin: 0 0 12px 0;
+  margin: 0;
   font-size: 14px;
   letter-spacing:.2px;
   font-weight: 900;
   color: rgba(245,247,255,.92);
 }
 
-/* Canvas box: smaller, friendly donut */
-.card.large{
-  min-height: 360px;
+/* Top row inside cards */
+.cardTop{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:12px;
+  margin-bottom: 12px;
 }
 
-.card.large canvas{
-  max-height: 260px !important; /* más chico */
+.chip{
+  font-size:12px;
+  font-weight: 900;
+  letter-spacing:.2px;
+  padding: 7px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,.18);
+  background: rgba(255,255,255,.08);
+  color: rgba(245,247,255,.86);
 }
 
-/* ===== KPI (PLs / Eventos) ===== */
-.statRow{
+.chip.ghost{
+  background: rgba(10,10,20,.18);
+}
+
+/* Hints */
+.hint{
+  margin-top: 10px;
+  font-size: 12px;
+  color: rgba(245,247,255,.66);
+}
+
+/* ===== KPI ROW ===== */
+.kpiRow{
   display:grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-  margin-top: 8px;
+  grid-template-columns: repeat(4,1fr);
+  gap: 18px;
+  margin-bottom: 18px;
 }
 
 .kpi{
-  padding: 14px 14px;
-  border-radius: 16px;
-  background: rgba(255,255,255,.08);
+  position:relative;
+  overflow:hidden;
+
+  border-radius: 18px;
+  padding: 16px 16px;
+  background: linear-gradient(135deg, rgba(255,255,255,.10), rgba(255,255,255,.06));
   border: 1px solid rgba(255,255,255,.14);
-  box-shadow: 0 10px 22px rgba(0,0,0,.18);
+  box-shadow: var(--shadowSoft);
+
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+.kpi::after{
+  content:"";
+  position:absolute;
+  width: 160px;
+  height: 160px;
+  right: -80px;
+  top: -80px;
+  background: radial-gradient(circle, rgba(59,130,246,.25), transparent 60%);
+  filter: blur(0px);
 }
 
 .big{
-  font-size: 28px;
+  font-size: 30px;
   font-weight: 900;
   letter-spacing: .2px;
   margin-top: 6px;
@@ -201,18 +252,26 @@ body{
   font-size: 12px;
 }
 
-/* Operadores list */
-.operadorList{
-  margin-top: 14px;
-  border-top: 1px solid rgba(255,255,255,.10);
-  padding-top: 12px;
+/* ===== CHART GRID ===== */
+.gridCharts{
+  display:grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: 18px;
+  margin-bottom: 18px;
 }
 
-.operadorList h4{
-  margin: 0 0 10px 0;
-  font-size: 12px;
-  font-weight: 900;
-  color: rgba(245,247,255,.85);
+.chartCard{
+  min-height: 340px;
+}
+
+.chartBox{
+  height: 260px;          /* controla tamaño del donut/barras */
+  width: 100%;
+}
+
+.chartBox canvas{
+  width:100% !important;
+  height:100% !important;
 }
 
 /* ===== Filters ===== */
@@ -257,14 +316,22 @@ input:focus, select:focus{
 .btn:hover{ filter: brightness(1.05); transform: translateY(-1px); }
 .btn:active{ transform: translateY(0px); }
 
-.btn.full{ grid-column: span 4; }
+/* ===== Registro layout ===== */
+.gridReg{
+  display:grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+  margin-bottom: 18px;
+}
 
-/* ===== Forms ===== */
 .formGrid{
   display:grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 12px;
 }
+
+.span2{ grid-column: span 2; }
+.full{ grid-column: span 4; }
 
 .check{
   display:flex;
@@ -278,17 +345,31 @@ input:focus, select:focus{
   font-size: 13px;
 }
 
-/* Registro list cards already inline-styled in JS, this smooths it */
-#plList > div{
+.plList{
+  display:grid;
+  gap: 12px;
+}
+
+/* Optional: give JS-injected cards a consistent look */
+.plList > div{
   background: rgba(255,255,255,.06);
   border: 1px solid rgba(255,255,255,.10);
   border-radius: 14px;
   padding: 14px;
 }
 
-@media (max-width: 980px){
-  .grid2{ grid-template-columns: 1fr; }
-  .formGrid{ grid-template-columns: 1fr; }
-  .btn.full{ grid-column: auto; }
+.operadorList{
+  display:grid;
+  gap: 8px;
+  padding-top: 2px;
+}
+
+/* ===== Responsive ===== */
+@media (max-width: 1040px){
+  .kpiRow{ grid-template-columns: 1fr 1fr; }
+  .gridCharts{ grid-template-columns: 1fr; }
   .filterGrid{ grid-template-columns: 1fr; }
+  .gridReg{ grid-template-columns: 1fr; }
+  .formGrid{ grid-template-columns: 1fr; }
+  .span2,.full{ grid-column: auto; }
 }
