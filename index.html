@@ -3,143 +3,207 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>Sistema Visitas PL</title>
+  <title>Sistema de Visitas PL</title>
 
+  <!-- Open Sans -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
 
+  <!-- Supabase + Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
 
-  <link rel="stylesheet" href="styles.css"/>
+  <link rel="stylesheet" href="./styles.css"/>
 </head>
 
 <body>
 
-<header class="header">
-  <div class="brand">
-    <div class="logo"></div>
-    <div>
-      <div class="title">Sistema de Visitas PL</div>
-      <div class="subtitle">Panel Corporativo</div>
-    </div>
-  </div>
-
-  <div class="tabs">
-    <button class="tab active" data-tab="dashboard">Dashboard</button>
-    <button class="tab" data-tab="registro">Registro</button>
-  </div>
-</header>
-
-<main class="container">
-
-  <!-- DASHBOARD -->
-  <section id="dashboard" class="panel active">
-
-    <div class="grid2">
-
-      <div class="card large">
-        <div class="cardHeader">
-          <h3>Distribución por tipo de comando</h3>
+  <header class="header">
+    <div class="headerInner">
+      <div class="brand">
+        <div class="logo"></div>
+        <div>
+          <div class="title">Sistema de Visitas PL</div>
+          <div class="subtitle">Liquid Glass · Panel Corporativo</div>
         </div>
-        <canvas id="pieChart"></canvas>
       </div>
 
+      <div class="tabs">
+        <button class="tab active" data-tab="dashboard" type="button">Dashboard</button>
+        <button class="tab" data-tab="registro" type="button">Registro</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+
+    <!-- ===================== DASHBOARD ===================== -->
+    <section id="dashboard" class="panel active">
+
+      <!-- KPI ROW -->
+      <div class="kpiRow">
+        <div class="kpi">
+          <div class="muted">PLs Totales</div>
+          <div id="statPls" class="big">0</div>
+        </div>
+
+        <div class="kpi">
+          <div class="muted">Eventos Totales</div>
+          <div id="statEventos" class="big">0</div>
+        </div>
+
+        <div class="kpi">
+          <div class="muted">Operadores</div>
+          <div id="statOperadores" class="big">0</div>
+        </div>
+
+        <div class="kpi">
+          <div class="muted">Grupo 2500</div>
+          <div id="stat2500" class="big">0</div>
+        </div>
+      </div>
+
+      <!-- CHARTS -->
+      <div class="gridCharts">
+
+        <div class="card chartCard">
+          <div class="cardTop">
+            <h3>Distribución por Comando</h3>
+            <div class="chip">Donut</div>
+          </div>
+          <div class="chartBox">
+            <canvas id="pieChart"></canvas>
+          </div>
+          <div class="hint">Tip: el color de cada segmento viene de <strong>tipos_evento</strong>.</div>
+        </div>
+
+        <div class="card chartCard">
+          <div class="cardTop">
+            <h3>PLs por Operador</h3>
+            <div class="chip">Barras</div>
+          </div>
+          <div class="chartBox">
+            <canvas id="barOperadores"></canvas>
+          </div>
+          <div class="hint">Conteo de PLs agrupadas por operador.</div>
+        </div>
+
+      </div>
+
+      <!-- FILTROS -->
       <div class="card">
-        <h3>Resumen General</h3>
-
-        <div class="statRow">
-          <div>
-            <div class="muted">PLs</div>
-            <div id="statPls" class="big">0</div>
-          </div>
-
-          <div>
-            <div class="muted">Eventos</div>
-            <div id="statEventos" class="big">0</div>
-          </div>
+        <div class="cardTop">
+          <h3>Filtros</h3>
+          <div class="chip ghost">Dashboard + Registro</div>
         </div>
 
+        <div class="filterGrid">
+          <select id="filterOperador"></select>
+          <select id="filterEstado"></select>
+
+          <select id="filterSemaforo">
+            <option value="">Semáforo (Todos)</option>
+            <option value="ROJA">ROJA</option>
+            <option value="VERDE">VERDE</option>
+          </select>
+
+          <select id="filter2500">
+            <option value="">Grupo 2500</option>
+            <option value="true">Sí</option>
+            <option value="false">No</option>
+          </select>
+
+          <button id="btnAplicarFiltros" class="btn" type="button">Aplicar</button>
+        </div>
+
+        <div class="hint">
+          (Opcional) En el siguiente paso conectamos estos filtros a Supabase y al render.
+        </div>
+      </div>
+
+      <!-- CONTADOR OPERADORES (si tu JS aún usa este contenedor, lo dejamos) -->
+      <div class="card">
+        <div class="cardTop">
+          <h3>Detalle Operadores</h3>
+          <div class="chip ghost">Lista</div>
+        </div>
         <div id="contadorOperadores" class="operadorList"></div>
+      </div>
+
+    </section>
+
+    <!-- ===================== REGISTRO ===================== -->
+    <section id="registro" class="panel">
+
+      <div class="gridReg">
+
+        <!-- AGREGAR PL -->
+        <div class="card">
+          <div class="cardTop">
+            <h3>Agregar PL</h3>
+            <div class="chip">PL</div>
+          </div>
+
+          <div class="formGrid">
+            <input id="pl" placeholder="PL"/>
+            <input id="razon_social" placeholder="RAZÓN SOCIAL"/>
+            <input id="estado" placeholder="ESTADO"/>
+            <input id="municipio" placeholder="MUNICIPIO"/>
+
+            <input id="direccion" class="span2" placeholder="DIRECCIÓN"/>
+            <input id="operador" placeholder="OPERADOR"/>
+
+            <select id="semaforo">
+              <option value="VERDE">VERDE</option>
+              <option value="ROJA">ROJA</option>
+            </select>
+
+            <label class="check">
+              <input id="grupo_2500" type="checkbox"/>
+              Grupo 2500
+            </label>
+
+            <button id="btnAddPL" class="btn full" type="button">Guardar PL</button>
+          </div>
+
+          <div class="hint">Se crea el registro base de la PL.</div>
+        </div>
+
+        <!-- REGISTRAR EVENTO -->
+        <div class="card">
+          <div class="cardTop">
+            <h3>Registrar Evento</h3>
+            <div class="chip">Visita</div>
+          </div>
+
+          <div class="formGrid">
+            <select id="ev_pl"></select>
+            <select id="ev_tipo"></select>
+            <input id="ev_fecha" type="date"/>
+            <input id="ev_notas" placeholder="Notas (opcional)"/>
+
+            <button id="btnAddEvento" class="btn full" type="button">Guardar Evento</button>
+          </div>
+
+          <div class="hint">Los eventos alimentan el donut del Dashboard.</div>
+        </div>
 
       </div>
 
-    </div>
-
-    <!-- FILTROS -->
-    <div class="card">
-      <h3>Filtros</h3>
-
-      <div class="filterGrid">
-        <select id="filterOperador"></select>
-        <select id="filterEstado"></select>
-        <select id="filterSemaforo">
-          <option value="">Todos</option>
-          <option value="ROJA">ROJA</option>
-          <option value="VERDE">VERDE</option>
-        </select>
-        <select id="filter2500">
-          <option value="">Grupo 2500</option>
-          <option value="true">Sí</option>
-          <option value="false">No</option>
-        </select>
-
-        <button id="btnAplicarFiltros" class="btn">Aplicar</button>
+      <!-- LISTA / MINI HISTORIAL -->
+      <div class="card">
+        <div class="cardTop">
+          <h3>Mini-historial por PL</h3>
+          <div class="chip ghost">Últimos eventos</div>
+        </div>
+        <div id="plList" class="plList"></div>
       </div>
-    </div>
 
-  </section>
+    </section>
 
-  <!-- REGISTRO -->
-  <section id="registro" class="panel">
+  </main>
 
-    <div class="card">
-      <h3>Agregar PL</h3>
-
-      <div class="formGrid">
-        <input id="pl" placeholder="PL"/>
-        <input id="razon_social" placeholder="RAZÓN SOCIAL"/>
-        <input id="estado" placeholder="ESTADO"/>
-        <input id="municipio" placeholder="MUNICIPIO"/>
-        <input id="direccion" placeholder="DIRECCIÓN"/>
-        <input id="operador" placeholder="OPERADOR"/>
-
-        <select id="semaforo">
-          <option value="VERDE">VERDE</option>
-          <option value="ROJA">ROJA</option>
-        </select>
-
-        <label class="check">
-          <input id="grupo_2500" type="checkbox"/>
-          Grupo 2500
-        </label>
-
-        <button id="btnAddPL" class="btn full">Guardar PL</button>
-      </div>
-    </div>
-
-    <div class="card">
-      <h3>Registrar Evento</h3>
-
-      <div class="formGrid">
-        <select id="ev_pl"></select>
-        <select id="ev_tipo"></select>
-        <input id="ev_fecha" type="date"/>
-        <input id="ev_notas" placeholder="Notas"/>
-        <button id="btnAddEvento" class="btn full">Guardar Evento</button>
-      </div>
-    </div>
-
-    <div class="card">
-      <h3>Listado de PLs</h3>
-      <div id="plList"></div>
-    </div>
-
-  </section>
-
-</main>
-
-<script src="app.js"></script>
+  <script src="./app.js"></script>
 </body>
 </html>
