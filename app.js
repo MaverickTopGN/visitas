@@ -4,7 +4,6 @@
 const SUPABASE_URL = "https://bpdafatlwefzrqcgvtss.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJwZGFmYXRsd2VmenJxY2d2dHNzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE0NDQzMDcsImV4cCI6MjA4NzAyMDMwN30.KyDRMcUcIytKCd2hZDmQ-6N-vex5pKk22MpUedDdusk";
 
-// Creamos el cliente UNA sola vez (sin redeclarar "supabase")
 const supabaseClient = window.supabase.createClient(
   SUPABASE_URL,
   SUPABASE_ANON_KEY
@@ -14,15 +13,19 @@ const supabaseClient = window.supabase.createClient(
 // GLOBAL STATE
 // ============================
 let RAW = { pls: [], eventos: [], tipos: [] };
-let FILTERS = {
-  operador: "",
-  estado: "",
-  semaforo: "",
-  grupo2500: "", // "" | "true" | "false"
-};
+let FILTERS = { operador: "", estado: "", semaforo: "", grupo2500: "" };
+
+// Calendario (mes seleccionado)
+let CAL_MONTH = new Date().toISOString().slice(0, 7); // "YYYY-MM"
 
 let pieChart = null;
 let barChart = null;
+
+// Vista filtrada actual (para modal y export)
+let VIEW = {
+  plsFiltered: [],
+  eventosFiltered: [],
+};
 
 // ============================
 // HELPERS
@@ -43,13 +46,10 @@ function escapeHtml(s) {
 function showTab(tabId) {
   qsa(".tab").forEach((b) => b.classList.remove("active"));
   qsa(".panel").forEach((p) => p.classList.remove("active"));
-
   const btn = document.querySelector(`.tab[data-tab="${tabId}"]`);
   const panel = el(tabId);
-
   if (btn) btn.classList.add("active");
   if (panel) panel.classList.add("active");
-
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
@@ -58,10 +58,20 @@ function uniqSorted(arr) {
     .sort((a, b) => a.localeCompare(b, "es"));
 }
 
-function asBoolStr(v) {
-  if (v === true) return "true";
-  if (v === false) return "false";
-  return "";
+function fmtDateISOToPretty(iso) {
+  // iso "YYYY-MM-DD"
+  if (!iso) return "";
+  const [y, m, d] = iso.split("-").map(Number);
+  const months = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
+  return `${d} ${months[m-1]} ${y}`;
+}
+
+function csvEscape(v) {
+  const s = String(v ?? "");
+  if (s.includes('"') || s.includes(",") || s.includes("\n")) {
+    return `"${s.replace(/"/g, '""')}"`;
+  }
+  return s;
 }
 
 // ============================
@@ -75,14 +85,27 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   // Buttons
-  const btnAddPL = el("btnAddPL");
-  if (btnAddPL) btnAddPL.addEventListener("click", onAddPL);
+  el("btnAddPL")?.addEventListener("click", onAddPL);
+  el("btnAddEvento")?.addEventListener("click", onAddEvento);
+  el("btnAplicarFiltros")?.addEventListener("click", onApplyFilters);
 
-  const btnAddEvento = el("btnAddEvento");
-  if (btnAddEvento) btnAddEvento.addEventListener("click", onAddEvento);
+  // Calendar + Export
+  const monthInput = el("calMonth");
+  if (monthInput) {
+    monthInput.value = CAL_MONTH;
+    monthInput.addEventListener("change", () => {
+      CAL_MONTH = monthInput.value || CAL_MONTH;
+      renderCalendar(); // solo el calendario
+    });
+  }
 
-  const btnFiltros = el("btnAplicarFiltros");
-  if (btnFiltros) btnFiltros.addEventListener("click", onApplyFilters);
+  el("btnExportCSV")?.addEventListener("click", exportCSVForSelectedMonth);
+
+  // Modal
+  el("btnCloseModal")?.addEventListener("click", closeModal);
+  el("dayModal")?.addEventListener("click", (e) => {
+    if (e.target && e.target.id === "dayModal") closeModal();
+  });
 
   // Boot
   boot();
@@ -99,16 +122,9 @@ async function fetchAll() {
       supabaseClient.from("tipos_evento").select("*").order("nombre", { ascending: true }),
     ]);
 
-  if (e1 || e2 || e3) {
-    console.error("Supabase error:", e1 || e2 || e3);
-    // Devolvemos lo que haya, sin reventar UI
-  }
+  if (e1 || e2 || e3) console.error("Supabase error:", e1 || e2 || e3);
 
-  return {
-    pls: pls || [],
-    eventos: eventos || [],
-    tipos: tipos || [],
-  };
+  return { pls: pls || [], eventos: eventos || [], tipos: tipos || [] };
 }
 
 // ============================
@@ -121,10 +137,8 @@ function applyFilters(raw) {
     if (operador && String(p.operador || "").trim() !== operador) return false;
     if (estado && String(p.estado || "").trim() !== estado) return false;
     if (semaforo && String(p.semaforo || "").trim() !== semaforo) return false;
-
     if (grupo2500 === "true" && !p.grupo_2500) return false;
     if (grupo2500 === "false" && p.grupo_2500) return false;
-
     return true;
   });
 
@@ -145,43 +159,35 @@ function renderFilterSelects(pls) {
   const selEst = el("filterEstado");
 
   if (selOp) {
-    const current = FILTERS.operador;
     selOp.innerHTML = `<option value="">Operador (Todos)</option>` +
       ops.map((x) => `<option value="${escapeHtml(x)}">${escapeHtml(x)}</option>`).join("");
-    selOp.value = current;
+    selOp.value = FILTERS.operador || "";
   }
 
   if (selEst) {
-    const current = FILTERS.estado;
     selEst.innerHTML = `<option value="">Estado (Todos)</option>` +
       ests.map((x) => `<option value="${escapeHtml(x)}">${escapeHtml(x)}</option>`).join("");
-    selEst.value = current;
+    selEst.value = FILTERS.estado || "";
   }
 
-  const selSem = el("filterSemaforo");
-  if (selSem) selSem.value = FILTERS.semaforo || "";
-
-  const sel2500 = el("filter2500");
-  if (sel2500) sel2500.value = FILTERS.grupo2500 || "";
+  el("filterSemaforo") && (el("filterSemaforo").value = FILTERS.semaforo || "");
+  el("filter2500") && (el("filter2500").value = FILTERS.grupo2500 || "");
 }
 
 // ============================
 // RENDER: KPIs
 // ============================
 function renderKPIs(plsFiltered, eventosFiltered) {
-  const statPls = el("statPls");
-  const statEventos = el("statEventos");
-  const statOperadores = el("statOperadores");
-  const stat2500 = el("stat2500");
+  el("statPls") && (el("statPls").innerText = plsFiltered.length);
+  el("statEventos") && (el("statEventos").innerText = eventosFiltered.length);
 
-  if (statPls) statPls.innerText = plsFiltered.length;
-  if (statEventos) statEventos.innerText = eventosFiltered.length;
-
-  const operadoresCount = new Set(plsFiltered.map((p) => (p.operador || "Sin operador").trim() || "Sin operador")).size;
-  if (statOperadores) statOperadores.innerText = operadoresCount;
+  const operadoresCount = new Set(
+    plsFiltered.map((p) => (p.operador || "Sin operador").trim() || "Sin operador")
+  ).size;
+  el("statOperadores") && (el("statOperadores").innerText = operadoresCount);
 
   const g2500 = plsFiltered.filter((p) => p.grupo_2500).length;
-  if (stat2500) stat2500.innerText = g2500;
+  el("stat2500") && (el("stat2500").innerText = g2500);
 }
 
 // ============================
@@ -191,16 +197,12 @@ function renderDonut(tipos, eventosFiltered) {
   const canvas = el("pieChart");
   if (!canvas) return;
 
-  // count por tipo
   const count = {};
-  eventosFiltered.forEach((e) => {
-    count[e.tipo] = (count[e.tipo] || 0) + 1;
-  });
+  eventosFiltered.forEach((e) => (count[e.tipo] = (count[e.tipo] || 0) + 1));
 
   const labels = Object.keys(count);
   const values = Object.values(count);
 
-  // color por tipo (tipos_evento)
   const colors = labels.map((l) => {
     const tipo = tipos.find((t) => t.nombre === l);
     return tipo?.color || "#94A3B8";
@@ -252,7 +254,7 @@ function renderDonut(tipos, eventosFiltered) {
 }
 
 // ============================
-// RENDER: BARRAS por operador (PLs)
+// RENDER: BAR (PLs por operador)
 // ============================
 function renderBarOperadores(plsFiltered) {
   const canvas = el("barOperadores");
@@ -328,21 +330,18 @@ function renderDetalleOperadores(plsFiltered) {
 
   const entries = Object.entries(map).sort((a, b) => b[1] - a[1]);
 
-  if (!entries.length) {
-    cont.innerHTML = `<div style="color:rgba(245,247,255,.65); font-size:12px;">Sin datos con los filtros actuales.</div>`;
-    return;
-  }
-
-  cont.innerHTML = entries.map(([op, n]) => `
-    <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:1px solid rgba(255,255,255,.10);">
-      <span style="color:rgba(245,247,255,.85); font-weight:800;">${escapeHtml(op)}</span>
-      <span style="color:rgba(245,247,255,.92); font-weight:900;">${n}</span>
-    </div>
-  `).join("");
+  cont.innerHTML = entries.length
+    ? entries.map(([op, n]) => `
+      <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:1px solid rgba(255,255,255,.10);">
+        <span style="color:rgba(245,247,255,.85); font-weight:800;">${escapeHtml(op)}</span>
+        <span style="color:rgba(245,247,255,.92); font-weight:900;">${n}</span>
+      </div>
+    `).join("")
+    : `<div style="color:rgba(245,247,255,.65); font-size:12px;">Sin datos con los filtros actuales.</div>`;
 }
 
 // ============================
-// RENDER: Registro selects (PL / Tipo)
+// REGISTRO: selectors + mini-historial
 // ============================
 function renderRegistroSelectors(plsFiltered, tipos) {
   const selPL = el("ev_pl");
@@ -351,24 +350,17 @@ function renderRegistroSelectors(plsFiltered, tipos) {
   if (selPL) {
     const current = selPL.value || "";
     selPL.innerHTML = `<option value="">Selecciona PL</option>` +
-      plsFiltered.map((p) =>
-        `<option value="${p.id}">${escapeHtml(p.pl)} — ${escapeHtml(p.razon_social)}</option>`
-      ).join("");
-    // si existe aún
+      plsFiltered.map((p) => `<option value="${p.id}">${escapeHtml(p.pl)} — ${escapeHtml(p.razon_social)}</option>`).join("");
     if (current && plsFiltered.some((p) => p.id === current)) selPL.value = current;
   }
 
   if (selTipo) {
     const current = selTipo.value || "";
-    selTipo.innerHTML =
-      tipos.map((t) => `<option value="${escapeHtml(t.nombre)}">${escapeHtml(t.nombre)}</option>`).join("");
+    selTipo.innerHTML = tipos.map((t) => `<option value="${escapeHtml(t.nombre)}">${escapeHtml(t.nombre)}</option>`).join("");
     if (current && tipos.some((t) => t.nombre === current)) selTipo.value = current;
   }
 }
 
-// ============================
-// RENDER: Mini-historial por PL
-// ============================
 function renderMiniHistorial(plsFiltered, eventosFiltered) {
   const wrap = el("plList");
   if (!wrap) return;
@@ -379,9 +371,7 @@ function renderMiniHistorial(plsFiltered, eventosFiltered) {
   }
 
   wrap.innerHTML = plsFiltered.map((p) => {
-    const hist = eventosFiltered
-      .filter((e) => e.pl_id === p.id)
-      .slice(0, 6); // últimos 6
+    const hist = eventosFiltered.filter((e) => e.pl_id === p.id).slice(0, 6);
 
     const semColor = p.semaforo === "ROJA" ? "#DC2626" : "#16A34A";
     const semBg = p.semaforo === "ROJA" ? "rgba(220,38,38,.18)" : "rgba(22,163,74,.18)";
@@ -411,9 +401,7 @@ function renderMiniHistorial(plsFiltered, eventosFiltered) {
       <div style="border:1px solid rgba(255,255,255,.12); border-radius:14px; padding:14px;">
         <div style="display:flex; justify-content:space-between; gap:12px; align-items:flex-start;">
           <div>
-            <div style="font-weight:900; color:rgba(245,247,255,.95);">
-              ${escapeHtml(p.pl)} — ${escapeHtml(p.razon_social)}
-            </div>
+            <div style="font-weight:900; color:rgba(245,247,255,.95);">${escapeHtml(p.pl)} — ${escapeHtml(p.razon_social)}</div>
             <div style="font-size:12px; color:rgba(245,247,255,.62); margin-top:4px;">
               ${escapeHtml(p.estado)} / ${escapeHtml(p.municipio)} · ${escapeHtml(p.operador)}
             </div>
@@ -422,14 +410,203 @@ function renderMiniHistorial(plsFiltered, eventosFiltered) {
         </div>
 
         <div style="margin-top:10px;">
-          <div style="font-weight:900; font-size:12px; color:rgba(245,247,255,.86); margin-bottom:6px;">
-            Mini-historial
-          </div>
+          <div style="font-weight:900; font-size:12px; color:rgba(245,247,255,.86); margin-bottom:6px;">Mini-historial</div>
           ${histHtml}
         </div>
       </div>
     `;
   }).join("");
+}
+
+// ============================
+// CALENDAR (Monthly) + Modal
+// ============================
+function getMonthParts(ym) {
+  const [y, m] = (ym || CAL_MONTH).split("-").map(Number); // m 1-12
+  return { y, m };
+}
+
+function daysInMonth(y, m) {
+  return new Date(y, m, 0).getDate(); // m is 1-12
+}
+
+function weekdayMonFirst(y, m, d) {
+  // JS: 0 Sun .. 6 Sat
+  const js = new Date(y, m - 1, d).getDay();
+  // convert to Mon-first: 0 Mon .. 6 Sun
+  return (js + 6) % 7;
+}
+
+function calendarIntensity(count, max) {
+  if (!count) return 0;
+  if (max <= 1) return 2;
+  const ratio = count / max; // 0..1
+  if (ratio <= 0.25) return 1;
+  if (ratio <= 0.50) return 2;
+  if (ratio <= 0.75) return 3;
+  return 4;
+}
+
+function renderCalendar() {
+  const grid = el("calendarGrid");
+  if (!grid) return;
+
+  const { y, m } = getMonthParts(CAL_MONTH);
+
+  // Agrupar eventos por fecha (solo del mes seleccionado)
+  const monthPrefix = `${y}-${String(m).padStart(2, "0")}-`;
+  const eventsMonth = VIEW.eventosFiltered.filter((e) => String(e.fecha || "").startsWith(monthPrefix));
+
+  const byDate = {};
+  for (const e of eventsMonth) {
+    const key = e.fecha;
+    byDate[key] = (byDate[key] || 0) + 1;
+  }
+
+  const max = Math.max(0, ...Object.values(byDate));
+
+  // Construir celdas
+  const totalDays = daysInMonth(y, m);
+  const firstDow = weekdayMonFirst(y, m, 1); // 0..6
+
+  const cells = [];
+
+  // empty leading
+  for (let i = 0; i < firstDow; i++) {
+    cells.push(`<div class="calCell empty"></div>`);
+  }
+
+  for (let day = 1; day <= totalDays; day++) {
+    const dateISO = `${y}-${String(m).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    const c = byDate[dateISO] || 0;
+    const level = calendarIntensity(c, max);
+
+    cells.push(`
+      <div class="calCell level${level}" data-date="${dateISO}" ${c ? "" : 'aria-disabled="true"'}>
+        <div class="calDay">${day}</div>
+        ${c ? `<div class="calCount">${c}</div>` : ""}
+      </div>
+    `);
+  }
+
+  grid.innerHTML = cells.join("");
+
+  // Click handlers
+  qsa(".calCell").forEach((cell) => {
+    const date = cell.dataset.date;
+    if (!date) return;
+    cell.addEventListener("click", () => openModalForDate(date));
+  });
+}
+
+function openModalForDate(dateISO) {
+  const modal = el("dayModal");
+  const title = el("modalTitle");
+  const subtitle = el("modalSubtitle");
+  const body = el("modalBody");
+  if (!modal || !body) return;
+
+  const plsMap = new Map(VIEW.plsFiltered.map((p) => [p.id, p]));
+  const items = VIEW.eventosFiltered
+    .filter((e) => e.fecha === dateISO)
+    .map((e) => {
+      const p = plsMap.get(e.pl_id);
+      const pl = p?.pl || "—";
+      const rs = p?.razon_social || "";
+      const op = p?.operador || "";
+      const edo = p?.estado || "";
+      const mun = p?.municipio || "";
+      const sem = p?.semaforo || "";
+      const g2500 = p?.grupo_2500 ? "Sí" : "No";
+
+      return {
+        tipo: e.tipo,
+        notas: e.notas || "",
+        pl, rs, op, edo, mun, sem, g2500
+      };
+    });
+
+  const pretty = fmtDateISOToPretty(dateISO);
+
+  title && (title.textContent = `Detalle del día · ${pretty}`);
+  subtitle && (subtitle.textContent = `${items.length} evento(s) — filtros aplicados`);
+
+  if (!items.length) {
+    body.innerHTML = `<div class="muted">No hay eventos en este día con los filtros actuales.</div>`;
+  } else {
+    body.innerHTML = items.map((it) => `
+      <div class="modalItem">
+        <div class="modalItemTop">
+          <div class="modalStrong">${escapeHtml(it.tipo)}</div>
+          <div class="muted">${escapeHtml(it.pl)} — ${escapeHtml(it.rs)}</div>
+        </div>
+        <div class="modalMeta">
+          ${escapeHtml(it.edo)} / ${escapeHtml(it.mun)} · ${escapeHtml(it.op)} · Semáforo: <strong>${escapeHtml(it.sem)}</strong> · 2500: <strong>${escapeHtml(it.g2500)}</strong>
+          ${it.notas ? `<div style="margin-top:6px;">Notas: ${escapeHtml(it.notas)}</div>` : ""}
+        </div>
+      </div>
+    `).join("");
+  }
+
+  modal.classList.add("open");
+  modal.setAttribute("aria-hidden", "false");
+}
+
+function closeModal() {
+  const modal = el("dayModal");
+  if (!modal) return;
+  modal.classList.remove("open");
+  modal.setAttribute("aria-hidden", "true");
+}
+
+// ============================
+// EXPORT CSV (month selected + filters)
+// ============================
+function exportCSVForSelectedMonth() {
+  const { y, m } = getMonthParts(CAL_MONTH);
+  const monthPrefix = `${y}-${String(m).padStart(2, "0")}-`;
+
+  const plsMap = new Map(VIEW.plsFiltered.map((p) => [p.id, p]));
+  const rows = VIEW.eventosFiltered
+    .filter((e) => String(e.fecha || "").startsWith(monthPrefix))
+    .map((e) => {
+      const p = plsMap.get(e.pl_id) || {};
+      return {
+        fecha: e.fecha || "",
+        tipo: e.tipo || "",
+        notas: e.notas || "",
+        pl: p.pl || "",
+        razon_social: p.razon_social || "",
+        operador: p.operador || "",
+        estado: p.estado || "",
+        municipio: p.municipio || "",
+        direccion: p.direccion || "",
+        semaforo: p.semaforo || "",
+        grupo_2500: p.grupo_2500 ? "Sí" : "No",
+      };
+    });
+
+  const headers = [
+    "fecha","tipo","notas","pl","razon_social","operador","estado","municipio","direccion","semaforo","grupo_2500"
+  ];
+
+  const csv =
+    headers.join(",") + "\n" +
+    rows.map((r) => headers.map((h) => csvEscape(r[h])).join(",")).join("\n");
+
+  const filename = `eventos_${y}-${String(m).padStart(2, "0")}_filtrado.csv`;
+
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+
+  URL.revokeObjectURL(url);
 }
 
 // ============================
@@ -440,12 +617,11 @@ function onApplyFilters() {
   FILTERS.estado = el("filterEstado")?.value || "";
   FILTERS.semaforo = el("filterSemaforo")?.value || "";
   FILTERS.grupo2500 = el("filter2500")?.value || "";
-
-  renderAll(); // re-render con filtros
+  renderAll();
 }
 
 // ============================
-// ACTIONS: INSERT PL
+// INSERTS
 // ============================
 async function onAddPL() {
   const payload = {
@@ -468,20 +644,16 @@ async function onAddPL() {
   }
 
   // limpiar
-  ["pl", "razon_social", "estado", "municipio", "direccion", "operador"].forEach((id) => {
-    const node = el(id);
-    if (node) node.value = "";
+  ["pl","razon_social","estado","municipio","direccion","operador"].forEach((id) => {
+    const n = el(id); if (n) n.value = "";
   });
-  if (el("semaforo")) el("semaforo").value = "VERDE";
-  if (el("grupo_2500")) el("grupo_2500").checked = false;
+  el("semaforo") && (el("semaforo").value = "VERDE");
+  el("grupo_2500") && (el("grupo_2500").checked = false);
 
   await boot(true);
   showTab("registro");
 }
 
-// ============================
-// ACTIONS: INSERT EVENTO
-// ============================
 async function onAddEvento() {
   const payload = {
     pl_id: el("ev_pl")?.value || "",
@@ -500,8 +672,8 @@ async function onAddEvento() {
     return alert("Error guardando evento.");
   }
 
-  if (el("ev_fecha")) el("ev_fecha").value = "";
-  if (el("ev_notas")) el("ev_notas").value = "";
+  el("ev_fecha") && (el("ev_fecha").value = "");
+  el("ev_notas") && (el("ev_notas").value = "");
 
   await boot(true);
   showTab("registro");
@@ -511,25 +683,23 @@ async function onAddEvento() {
 // RENDER ALL
 // ============================
 function renderAll() {
-  // 1) Selects de filtros se alimentan del RAW completo (para que siempre tengas todas las opciones)
+  // filtros (opciones)
   renderFilterSelects(RAW.pls);
 
-  // 2) Aplicar filtros reales
+  // aplicar filtros
   const { plsFiltered, eventosFiltered } = applyFilters(RAW);
+  VIEW = { plsFiltered, eventosFiltered };
 
-  // 3) KPIs
+  // kpis + charts + registro
   renderKPIs(plsFiltered, eventosFiltered);
-
-  // 4) Charts
   renderDonut(RAW.tipos, eventosFiltered);
   renderBarOperadores(plsFiltered);
-
-  // 5) Detalle operadores (lista)
   renderDetalleOperadores(plsFiltered);
-
-  // 6) Registro (selects + mini historial) usa filtrados para que coincida con lo que estás viendo
   renderRegistroSelectors(plsFiltered, RAW.tipos);
   renderMiniHistorial(plsFiltered, eventosFiltered);
+
+  // calendario mensual
+  renderCalendar();
 }
 
 // ============================
@@ -540,11 +710,9 @@ async function boot(forceReload = false) {
     RAW = await fetchAll();
   }
 
-  // Si filtros seleccionados ya no existen, los limpiamos elegantemente
-  const ops = uniqSorted(RAW.pls.map((p) => p.operador));
-  const ests = uniqSorted(RAW.pls.map((p) => p.estado));
-  if (FILTERS.operador && !ops.includes(FILTERS.operador)) FILTERS.operador = "";
-  if (FILTERS.estado && !ests.includes(FILTERS.estado)) FILTERS.estado = "";
+  // Si el input month existe y está vacío, set default
+  const mi = el("calMonth");
+  if (mi && !mi.value) mi.value = CAL_MONTH;
 
   renderAll();
 }
