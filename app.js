@@ -18,14 +18,15 @@ let FILTERS = { operador: "", estado: "", semaforo: "", grupo2500: "" };
 // Calendario (mes seleccionado)
 let CAL_MONTH = new Date().toISOString().slice(0, 7); // "YYYY-MM"
 
+// Charts
 let pieChart = null;
 let barChart = null;
 
-// Vista filtrada actual (para modal y export)
-let VIEW = {
-  plsFiltered: [],
-  eventosFiltered: [],
-};
+// Vista filtrada actual (para calendario, modal, export, registro)
+let VIEW = { plsFiltered: [], eventosFiltered: [] };
+
+// Edición
+let EDIT_PL_ID = null;
 
 // ============================
 // HELPERS
@@ -59,7 +60,6 @@ function uniqSorted(arr) {
 }
 
 function fmtDateISOToPretty(iso) {
-  // iso "YYYY-MM-DD"
   if (!iso) return "";
   const [y, m, d] = iso.split("-").map(Number);
   const months = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
@@ -68,9 +68,7 @@ function fmtDateISOToPretty(iso) {
 
 function csvEscape(v) {
   const s = String(v ?? "");
-  if (s.includes('"') || s.includes(",") || s.includes("\n")) {
-    return `"${s.replace(/"/g, '""')}"`;
-  }
+  if (s.includes('"') || s.includes(",") || s.includes("\n")) return `"${s.replace(/"/g, '""')}"`;
   return s;
 }
 
@@ -84,27 +82,35 @@ document.addEventListener("DOMContentLoaded", () => {
     btn.addEventListener("click", () => showTab(btn.dataset.tab));
   });
 
-  // Buttons
+  // Inserts
   el("btnAddPL")?.addEventListener("click", onAddPL);
   el("btnAddEvento")?.addEventListener("click", onAddEvento);
+
+  // Filtros
   el("btnAplicarFiltros")?.addEventListener("click", onApplyFilters);
 
-  // Calendar + Export
+  // Calendario + Export
   const monthInput = el("calMonth");
   if (monthInput) {
     monthInput.value = CAL_MONTH;
     monthInput.addEventListener("change", () => {
       CAL_MONTH = monthInput.value || CAL_MONTH;
-      renderCalendar(); // solo el calendario
+      renderCalendar();
     });
   }
-
   el("btnExportCSV")?.addEventListener("click", exportCSVForSelectedMonth);
 
-  // Modal
-  el("btnCloseModal")?.addEventListener("click", closeModal);
+  // Modal día
+  el("btnCloseModal")?.addEventListener("click", closeDayModal);
   el("dayModal")?.addEventListener("click", (e) => {
-    if (e.target && e.target.id === "dayModal") closeModal();
+    if (e.target && e.target.id === "dayModal") closeDayModal();
+  });
+
+  // Modal editar PL
+  el("btnCloseEditPl")?.addEventListener("click", closeEditPlModal);
+  el("btnSaveEditPl")?.addEventListener("click", saveEditPl);
+  el("editPlModal")?.addEventListener("click", (e) => {
+    if (e.target && e.target.id === "editPlModal") closeEditPlModal();
   });
 
   // Boot
@@ -123,7 +129,6 @@ async function fetchAll() {
     ]);
 
   if (e1 || e2 || e3) console.error("Supabase error:", e1 || e2 || e3);
-
   return { pls: pls || [], eventos: eventos || [], tipos: tipos || [] };
 }
 
@@ -159,13 +164,15 @@ function renderFilterSelects(pls) {
   const selEst = el("filterEstado");
 
   if (selOp) {
-    selOp.innerHTML = `<option value="">Operador (Todos)</option>` +
+    selOp.innerHTML =
+      `<option value="">Operador (Todos)</option>` +
       ops.map((x) => `<option value="${escapeHtml(x)}">${escapeHtml(x)}</option>`).join("");
     selOp.value = FILTERS.operador || "";
   }
 
   if (selEst) {
-    selEst.innerHTML = `<option value="">Estado (Todos)</option>` +
+    selEst.innerHTML =
+      `<option value="">Estado (Todos)</option>` +
       ests.map((x) => `<option value="${escapeHtml(x)}">${escapeHtml(x)}</option>`).join("");
     selEst.value = FILTERS.estado || "";
   }
@@ -191,7 +198,7 @@ function renderKPIs(plsFiltered, eventosFiltered) {
 }
 
 // ============================
-// RENDER: DONUT (por comando)
+// RENDER: DONUT
 // ============================
 function renderDonut(tipos, eventosFiltered) {
   const canvas = el("pieChart");
@@ -341,7 +348,7 @@ function renderDetalleOperadores(plsFiltered) {
 }
 
 // ============================
-// REGISTRO: selectors + mini-historial
+// REGISTRO: selectors + mini-historial (con EDITAR)
 // ============================
 function renderRegistroSelectors(plsFiltered, tipos) {
   const selPL = el("ev_pl");
@@ -349,14 +356,18 @@ function renderRegistroSelectors(plsFiltered, tipos) {
 
   if (selPL) {
     const current = selPL.value || "";
-    selPL.innerHTML = `<option value="">Selecciona PL</option>` +
-      plsFiltered.map((p) => `<option value="${p.id}">${escapeHtml(p.pl)} — ${escapeHtml(p.razon_social)}</option>`).join("");
+    selPL.innerHTML =
+      `<option value="">Selecciona PL</option>` +
+      plsFiltered.map((p) =>
+        `<option value="${p.id}">${escapeHtml(p.pl)} — ${escapeHtml(p.razon_social)}</option>`
+      ).join("");
     if (current && plsFiltered.some((p) => p.id === current)) selPL.value = current;
   }
 
   if (selTipo) {
     const current = selTipo.value || "";
-    selTipo.innerHTML = tipos.map((t) => `<option value="${escapeHtml(t.nombre)}">${escapeHtml(t.nombre)}</option>`).join("");
+    selTipo.innerHTML =
+      tipos.map((t) => `<option value="${escapeHtml(t.nombre)}">${escapeHtml(t.nombre)}</option>`).join("");
     if (current && tipos.some((t) => t.nombre === current)) selTipo.value = current;
   }
 }
@@ -376,17 +387,6 @@ function renderMiniHistorial(plsFiltered, eventosFiltered) {
     const semColor = p.semaforo === "ROJA" ? "#DC2626" : "#16A34A";
     const semBg = p.semaforo === "ROJA" ? "rgba(220,38,38,.18)" : "rgba(22,163,74,.18)";
 
-    const tags = `
-      <div style="display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end;">
-        <span style="padding:6px 10px; border-radius:999px; font-size:12px; font-weight:900; background:${semBg}; color:${semColor}; border:1px solid rgba(255,255,255,.16);">
-          ${escapeHtml(p.semaforo)}
-        </span>
-        <span style="padding:6px 10px; border-radius:999px; font-size:12px; font-weight:900; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.14);">
-          2500: ${p.grupo_2500 ? "Sí" : "No"}
-        </span>
-      </div>
-    `;
-
     const histHtml = hist.length
       ? hist.map((h) => `
           <div style="display:flex; gap:10px; font-size:12px; color:rgba(245,247,255,.80); padding:4px 0;">
@@ -401,46 +401,131 @@ function renderMiniHistorial(plsFiltered, eventosFiltered) {
       <div style="border:1px solid rgba(255,255,255,.12); border-radius:14px; padding:14px;">
         <div style="display:flex; justify-content:space-between; gap:12px; align-items:flex-start;">
           <div>
-            <div style="font-weight:900; color:rgba(245,247,255,.95);">${escapeHtml(p.pl)} — ${escapeHtml(p.razon_social)}</div>
+            <div style="font-weight:900; color:rgba(245,247,255,.95);">
+              ${escapeHtml(p.pl)} — ${escapeHtml(p.razon_social)}
+            </div>
             <div style="font-size:12px; color:rgba(245,247,255,.62); margin-top:4px;">
               ${escapeHtml(p.estado)} / ${escapeHtml(p.municipio)} · ${escapeHtml(p.operador)}
             </div>
           </div>
-          ${tags}
+
+          <div style="display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end; align-items:center;">
+            <button class="iconBtn" type="button" data-edit-pl="${p.id}" style="padding:8px 10px; font-weight:900;">
+              Editar
+            </button>
+
+            <span style="padding:6px 10px; border-radius:999px; font-size:12px; font-weight:900; background:${semBg}; color:${semColor}; border:1px solid rgba(255,255,255,.16);">
+              ${escapeHtml(p.semaforo)}
+            </span>
+
+            <span style="padding:6px 10px; border-radius:999px; font-size:12px; font-weight:900; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.14);">
+              2500: ${p.grupo_2500 ? "Sí" : "No"}
+            </span>
+          </div>
         </div>
 
         <div style="margin-top:10px;">
-          <div style="font-weight:900; font-size:12px; color:rgba(245,247,255,.86); margin-bottom:6px;">Mini-historial</div>
+          <div style="font-weight:900; font-size:12px; color:rgba(245,247,255,.86); margin-bottom:6px;">
+            Mini-historial
+          </div>
           ${histHtml}
         </div>
       </div>
     `;
   }).join("");
+
+  // Bind editar
+  qsa("[data-edit-pl]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const id = btn.getAttribute("data-edit-pl");
+      const plRow = VIEW.plsFiltered.find((x) => x.id === id) || RAW.pls.find((x) => x.id === id);
+      if (plRow) openEditPlModal(plRow);
+    });
+  });
 }
 
 // ============================
-// CALENDAR (Monthly) + Modal
+// EDITAR PL: modal
+// ============================
+function openEditPlModal(plRow) {
+  EDIT_PL_ID = plRow.id;
+
+  el("editPlSubtitle").textContent = `${plRow.pl} — ${plRow.razon_social || ""}`;
+
+  el("edit_pl").value = plRow.pl || "";
+  el("edit_razon_social").value = plRow.razon_social || "";
+  el("edit_estado").value = plRow.estado || "";
+  el("edit_municipio").value = plRow.municipio || "";
+  el("edit_direccion").value = plRow.direccion || "";
+  el("edit_operador").value = plRow.operador || "";
+  el("edit_semaforo").value = plRow.semaforo || "VERDE";
+  el("edit_grupo_2500").checked = !!plRow.grupo_2500;
+
+  const modal = el("editPlModal");
+  modal.classList.add("open");
+  modal.setAttribute("aria-hidden", "false");
+}
+
+function closeEditPlModal() {
+  EDIT_PL_ID = null;
+  const modal = el("editPlModal");
+  if (!modal) return;
+  modal.classList.remove("open");
+  modal.setAttribute("aria-hidden", "true");
+}
+
+async function saveEditPl() {
+  if (!EDIT_PL_ID) return;
+
+  const payload = {
+    pl: el("edit_pl").value.trim(),
+    razon_social: el("edit_razon_social").value.trim(),
+    estado: el("edit_estado").value.trim(),
+    municipio: el("edit_municipio").value.trim(),
+    direccion: el("edit_direccion").value.trim(),
+    operador: el("edit_operador").value.trim(),
+    semaforo: el("edit_semaforo").value,
+    grupo_2500: el("edit_grupo_2500").checked,
+  };
+
+  if (!payload.pl) return alert("PL es obligatorio.");
+
+  const { error } = await supabaseClient
+    .from("pls")
+    .update(payload)
+    .eq("id", EDIT_PL_ID);
+
+  if (error) {
+    console.error(error);
+    return alert("No se pudo guardar. Revisa que el PL no esté duplicado.");
+  }
+
+  closeEditPlModal();
+  await boot(true);
+  showTab("registro");
+}
+
+// ============================
+// CALENDAR (Monthly) + Day Modal
 // ============================
 function getMonthParts(ym) {
-  const [y, m] = (ym || CAL_MONTH).split("-").map(Number); // m 1-12
+  const [y, m] = (ym || CAL_MONTH).split("-").map(Number);
   return { y, m };
 }
 
 function daysInMonth(y, m) {
-  return new Date(y, m, 0).getDate(); // m is 1-12
+  return new Date(y, m, 0).getDate();
 }
 
 function weekdayMonFirst(y, m, d) {
-  // JS: 0 Sun .. 6 Sat
-  const js = new Date(y, m - 1, d).getDay();
-  // convert to Mon-first: 0 Mon .. 6 Sun
-  return (js + 6) % 7;
+  const js = new Date(y, m - 1, d).getDay(); // 0 Sun..6 Sat
+  return (js + 6) % 7; // 0 Mon..6 Sun
 }
 
 function calendarIntensity(count, max) {
   if (!count) return 0;
   if (max <= 1) return 2;
-  const ratio = count / max; // 0..1
+  const ratio = count / max;
   if (ratio <= 0.25) return 1;
   if (ratio <= 0.50) return 2;
   if (ratio <= 0.75) return 3;
@@ -452,9 +537,8 @@ function renderCalendar() {
   if (!grid) return;
 
   const { y, m } = getMonthParts(CAL_MONTH);
-
-  // Agrupar eventos por fecha (solo del mes seleccionado)
   const monthPrefix = `${y}-${String(m).padStart(2, "0")}-`;
+
   const eventsMonth = VIEW.eventosFiltered.filter((e) => String(e.fecha || "").startsWith(monthPrefix));
 
   const byDate = {};
@@ -465,16 +549,11 @@ function renderCalendar() {
 
   const max = Math.max(0, ...Object.values(byDate));
 
-  // Construir celdas
   const totalDays = daysInMonth(y, m);
-  const firstDow = weekdayMonFirst(y, m, 1); // 0..6
+  const firstDow = weekdayMonFirst(y, m, 1);
 
   const cells = [];
-
-  // empty leading
-  for (let i = 0; i < firstDow; i++) {
-    cells.push(`<div class="calCell empty"></div>`);
-  }
+  for (let i = 0; i < firstDow; i++) cells.push(`<div class="calCell empty"></div>`);
 
   for (let day = 1; day <= totalDays; day++) {
     const dateISO = `${y}-${String(m).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
@@ -482,7 +561,7 @@ function renderCalendar() {
     const level = calendarIntensity(c, max);
 
     cells.push(`
-      <div class="calCell level${level}" data-date="${dateISO}" ${c ? "" : 'aria-disabled="true"'}>
+      <div class="calCell level${level}" data-date="${dateISO}">
         <div class="calDay">${day}</div>
         ${c ? `<div class="calCount">${c}</div>` : ""}
       </div>
@@ -491,15 +570,14 @@ function renderCalendar() {
 
   grid.innerHTML = cells.join("");
 
-  // Click handlers
   qsa(".calCell").forEach((cell) => {
     const date = cell.dataset.date;
     if (!date) return;
-    cell.addEventListener("click", () => openModalForDate(date));
+    cell.addEventListener("click", () => openDayModal(date));
   });
 }
 
-function openModalForDate(dateISO) {
+function openDayModal(dateISO) {
   const modal = el("dayModal");
   const title = el("modalTitle");
   const subtitle = el("modalSubtitle");
@@ -511,24 +589,20 @@ function openModalForDate(dateISO) {
     .filter((e) => e.fecha === dateISO)
     .map((e) => {
       const p = plsMap.get(e.pl_id);
-      const pl = p?.pl || "—";
-      const rs = p?.razon_social || "";
-      const op = p?.operador || "";
-      const edo = p?.estado || "";
-      const mun = p?.municipio || "";
-      const sem = p?.semaforo || "";
-      const g2500 = p?.grupo_2500 ? "Sí" : "No";
-
       return {
         tipo: e.tipo,
         notas: e.notas || "",
-        pl, rs, op, edo, mun, sem, g2500
+        pl: p?.pl || "—",
+        rs: p?.razon_social || "",
+        op: p?.operador || "",
+        edo: p?.estado || "",
+        mun: p?.municipio || "",
+        sem: p?.semaforo || "",
+        g2500: p?.grupo_2500 ? "Sí" : "No",
       };
     });
 
-  const pretty = fmtDateISOToPretty(dateISO);
-
-  title && (title.textContent = `Detalle del día · ${pretty}`);
+  title && (title.textContent = `Detalle del día · ${fmtDateISOToPretty(dateISO)}`);
   subtitle && (subtitle.textContent = `${items.length} evento(s) — filtros aplicados`);
 
   if (!items.length) {
@@ -552,7 +626,7 @@ function openModalForDate(dateISO) {
   modal.setAttribute("aria-hidden", "false");
 }
 
-function closeModal() {
+function closeDayModal() {
   const modal = el("dayModal");
   if (!modal) return;
   modal.classList.remove("open");
@@ -560,13 +634,14 @@ function closeModal() {
 }
 
 // ============================
-// EXPORT CSV (month selected + filters)
+// EXPORT CSV (month + filters)
 // ============================
 function exportCSVForSelectedMonth() {
   const { y, m } = getMonthParts(CAL_MONTH);
   const monthPrefix = `${y}-${String(m).padStart(2, "0")}-`;
 
   const plsMap = new Map(VIEW.plsFiltered.map((p) => [p.id, p]));
+
   const rows = VIEW.eventosFiltered
     .filter((e) => String(e.fecha || "").startsWith(monthPrefix))
     .map((e) => {
@@ -683,22 +758,24 @@ async function onAddEvento() {
 // RENDER ALL
 // ============================
 function renderAll() {
-  // filtros (opciones)
+  // 1) Selects de filtros desde RAW completo (siempre todas las opciones)
   renderFilterSelects(RAW.pls);
 
-  // aplicar filtros
+  // 2) Aplicar filtros
   const { plsFiltered, eventosFiltered } = applyFilters(RAW);
   VIEW = { plsFiltered, eventosFiltered };
 
-  // kpis + charts + registro
+  // 3) KPI + charts
   renderKPIs(plsFiltered, eventosFiltered);
   renderDonut(RAW.tipos, eventosFiltered);
   renderBarOperadores(plsFiltered);
+
+  // 4) Listas / registro
   renderDetalleOperadores(plsFiltered);
   renderRegistroSelectors(plsFiltered, RAW.tipos);
   renderMiniHistorial(plsFiltered, eventosFiltered);
 
-  // calendario mensual
+  // 5) Calendario
   renderCalendar();
 }
 
@@ -706,13 +783,17 @@ function renderAll() {
 // BOOT
 // ============================
 async function boot(forceReload = false) {
-  if (forceReload || !RAW.pls.length) {
-    RAW = await fetchAll();
-  }
+  if (forceReload || !RAW.pls.length) RAW = await fetchAll();
 
-  // Si el input month existe y está vacío, set default
+  // default month input
   const mi = el("calMonth");
   if (mi && !mi.value) mi.value = CAL_MONTH;
+
+  // si filtros seleccionados ya no existen, limpiarlos
+  const ops = uniqSorted(RAW.pls.map((p) => p.operador));
+  const ests = uniqSorted(RAW.pls.map((p) => p.estado));
+  if (FILTERS.operador && !ops.includes(FILTERS.operador)) FILTERS.operador = "";
+  if (FILTERS.estado && !ests.includes(FILTERS.estado)) FILTERS.estado = "";
 
   renderAll();
 }
