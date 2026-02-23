@@ -75,7 +75,7 @@
           <div class="chartBox">
             <canvas id="pieChart"></canvas>
           </div>
-          <div class="hint">Tip: el color de cada segmento viene de <strong>tipos_evento</strong>.</div>
+          <div class="hint">El color de cada comando viene de <strong>tipos_evento</strong>.</div>
         </div>
 
         <div class="card chartCard">
@@ -95,7 +95,7 @@
       <div class="card">
         <div class="cardTop">
           <h3>Filtros</h3>
-          <div class="chip ghost">Dashboard + Registro</div>
+          <div class="chip ghost">Afecta Dashboard + Registro</div>
         </div>
 
         <div class="filterGrid">
@@ -117,12 +117,42 @@
           <button id="btnAplicarFiltros" class="btn" type="button">Aplicar</button>
         </div>
 
-        <div class="hint">
-          (Opcional) En el siguiente paso conectamos estos filtros a Supabase y al render.
-        </div>
+        <div class="hint">Tip: después podemos hacer “auto-aplicar” sin botón y un “Reset filtros”.</div>
       </div>
 
-      <!-- CONTADOR OPERADORES (si tu JS aún usa este contenedor, lo dejamos) -->
+      <!-- EVENTOS POR DÍA (CALENDARIO) + EXPORT -->
+      <div class="card">
+        <div class="cardTop">
+          <h3>Eventos por Día (Calendario)</h3>
+          <div class="rightTools">
+            <input id="calMonth" class="monthInput" type="month" />
+            <button id="btnExportCSV" class="btn btnSecondary" type="button">Exportar CSV</button>
+          </div>
+        </div>
+
+        <div class="calLegend">
+          <span class="muted">Intensidad:</span>
+          <span class="calSwatch level0"></span>
+          <span class="calSwatch level1"></span>
+          <span class="calSwatch level2"></span>
+          <span class="calSwatch level3"></span>
+          <span class="calSwatch level4"></span>
+          <span class="muted">más eventos</span>
+        </div>
+
+        <div class="calendar">
+          <div class="calHeader">
+            <div class="calDow">Lun</div><div class="calDow">Mar</div><div class="calDow">Mié</div>
+            <div class="calDow">Jue</div><div class="calDow">Vie</div><div class="calDow">Sáb</div><div class="calDow">Dom</div>
+          </div>
+
+          <div id="calendarGrid" class="calGrid"></div>
+        </div>
+
+        <div class="hint">Click en un día para ver detalle. Exporta CSV del mes seleccionado respetando filtros.</div>
+      </div>
+
+      <!-- DETALLE OPERADORES (lista) -->
       <div class="card">
         <div class="cardTop">
           <h3>Detalle Operadores</h3>
@@ -167,7 +197,7 @@
             <button id="btnAddPL" class="btn full" type="button">Guardar PL</button>
           </div>
 
-          <div class="hint">Se crea el registro base de la PL.</div>
+          <div class="hint">Si te equivocas en el número, edítalo desde el mini-historial.</div>
         </div>
 
         <!-- REGISTRAR EVENTO -->
@@ -186,61 +216,16 @@
             <button id="btnAddEvento" class="btn full" type="button">Guardar Evento</button>
           </div>
 
-          <div class="hint">Los eventos alimentan el donut del Dashboard.</div>
+          <div class="hint">Los eventos alimentan el donut y el calendario.</div>
         </div>
 
       </div>
-<!-- EVENTOS POR DÍA (CALENDARIO) + EXPORT -->
-<div class="card">
-  <div class="cardTop">
-    <h3>Eventos por Día (Calendario)</h3>
-    <div class="rightTools">
-      <input id="calMonth" class="monthInput" type="month" />
-      <button id="btnExportCSV" class="btn btnSecondary" type="button">Exportar CSV</button>
-    </div>
-  </div>
-
-  <div class="calLegend">
-    <span class="muted">Intensidad:</span>
-    <span class="calSwatch level0"></span>
-    <span class="calSwatch level1"></span>
-    <span class="calSwatch level2"></span>
-    <span class="calSwatch level3"></span>
-    <span class="calSwatch level4"></span>
-    <span class="muted">más eventos</span>
-  </div>
-
-  <div class="calendar">
-    <div class="calHeader">
-      <div class="calDow">Lun</div><div class="calDow">Mar</div><div class="calDow">Mié</div>
-      <div class="calDow">Jue</div><div class="calDow">Vie</div><div class="calDow">Sáb</div><div class="calDow">Dom</div>
-    </div>
-
-    <div id="calendarGrid" class="calGrid"></div>
-  </div>
-
-  <div class="hint">Click en un día para ver detalle (PL + tipo + notas). Exporta CSV del mes seleccionado respetando filtros.</div>
-</div>
-
-<!-- MODAL: detalle del día -->
-<div id="dayModal" class="modalOverlay" aria-hidden="true">
-  <div class="modalCard" role="dialog" aria-modal="true">
-    <div class="modalTop">
-      <div>
-        <div id="modalTitle" class="modalTitle">Detalle del día</div>
-        <div id="modalSubtitle" class="modalSubtitle muted"></div>
-      </div>
-      <button id="btnCloseModal" class="iconBtn" type="button" aria-label="Cerrar">✕</button>
-    </div>
-    <div id="modalBody" class="modalBody"></div>
-  </div>
-</div>
 
       <!-- LISTA / MINI HISTORIAL -->
       <div class="card">
         <div class="cardTop">
           <h3>Mini-historial por PL</h3>
-          <div class="chip ghost">Últimos eventos</div>
+          <div class="chip ghost">Editar disponible</div>
         </div>
         <div id="plList" class="plList"></div>
       </div>
@@ -248,6 +233,57 @@
     </section>
 
   </main>
+
+  <!-- MODAL: detalle del día -->
+  <div id="dayModal" class="modalOverlay" aria-hidden="true">
+    <div class="modalCard" role="dialog" aria-modal="true">
+      <div class="modalTop">
+        <div>
+          <div id="modalTitle" class="modalTitle">Detalle del día</div>
+          <div id="modalSubtitle" class="modalSubtitle muted"></div>
+        </div>
+        <button id="btnCloseModal" class="iconBtn" type="button" aria-label="Cerrar">✕</button>
+      </div>
+      <div id="modalBody" class="modalBody"></div>
+    </div>
+  </div>
+
+  <!-- MODAL: Editar PL -->
+  <div id="editPlModal" class="modalOverlay" aria-hidden="true">
+    <div class="modalCard" role="dialog" aria-modal="true">
+      <div class="modalTop">
+        <div>
+          <div class="modalTitle">Editar PL</div>
+          <div id="editPlSubtitle" class="modalSubtitle muted"></div>
+        </div>
+        <button id="btnCloseEditPl" class="iconBtn" type="button" aria-label="Cerrar">✕</button>
+      </div>
+
+      <div class="modalBody">
+        <div class="formGrid" style="grid-template-columns: repeat(4, 1fr);">
+          <input id="edit_pl" placeholder="PL"/>
+          <input id="edit_razon_social" placeholder="RAZÓN SOCIAL"/>
+          <input id="edit_estado" placeholder="ESTADO"/>
+          <input id="edit_municipio" placeholder="MUNICIPIO"/>
+
+          <input id="edit_direccion" class="span2" placeholder="DIRECCIÓN"/>
+          <input id="edit_operador" placeholder="OPERADOR"/>
+
+          <select id="edit_semaforo">
+            <option value="VERDE">VERDE</option>
+            <option value="ROJA">ROJA</option>
+          </select>
+
+          <label class="check">
+            <input id="edit_grupo_2500" type="checkbox"/>
+            Grupo 2500
+          </label>
+
+          <button id="btnSaveEditPl" class="btn full" type="button">Guardar cambios</button>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <script src="./app.js"></script>
 </body>
